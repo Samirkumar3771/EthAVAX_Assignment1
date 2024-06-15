@@ -1,53 +1,56 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract SimpleBank {
-    mapping(address => uint256) private balances;
-
-    // Event to log the deposit operation
-    event Deposit(address indexed account, uint256 amount);
-
-    // Event to log the withdrawal operation
-    event Withdrawal(address indexed account, uint256 amount);
-
-    // Function to deposit Ether into the contract
-    function deposit() public payable {
-        // Using require to ensure a positive deposit amount
-        require(msg.value > 0, "Deposit amount must be greater than zero.");
-
-        // Update the balance
-        balances[msg.sender] += msg.value;
-
-        // Emit the Deposit event
-        emit Deposit(msg.sender, msg.value);
+contract TaskManager {
+    struct Task {
+        string description;
+        address assignee;
+        bool completed;
     }
 
-    // Function to withdraw Ether from the contract
-    function withdraw(uint256 _amount) public {
-        // Using require to ensure the sender has enough balance
-        require(balances[msg.sender] >= _amount, "Insufficient balance.");
+    mapping(uint256 => Task) public tasks;
+    uint256 public taskCount;
 
-        // Update the balance
-        balances[msg.sender] -= _amount;
+    event TaskCreated(uint256 taskId, string description);
+    event TaskAssigned(uint256 taskId, address assignee);
+    event TaskCompleted(uint256 taskId);
 
-        // Transfer the Ether and check for successful transfer using assert
-        (bool success, ) = msg.sender.call{value: _amount}("");
-        assert(success);
-
-        // Emit the Withdrawal event
-        emit Withdrawal(msg.sender, _amount);
+    function createTask(string memory description) public {
+        require(bytes(description).length > 0, "Description required");
+        taskCount++;
+        tasks[taskCount] = Task(description, address(0), false);
+        emit TaskCreated(taskCount, description);
     }
 
-    // Function to get the balance of the caller
-    function getBalance() public view returns (uint256) {
-        return balances[msg.sender];
+    function assignTask(uint256 taskId, address assignee) public {
+        Task storage task = tasks[taskId];
+        require(task.assignee == address(0), "Task already assigned");
+        task.assignee = assignee;
+        emit TaskAssigned(taskId, assignee);
     }
 
-    // Function to demonstrate the use of revert
-    function demoRevert(uint256 _value) public pure {
-        // If the value is less than 10, revert the transaction
-        if (_value < 10) {
-            revert("Value must be at least 10.");
+    function completeTask(uint256 taskId) public {
+        Task storage task = tasks[taskId];
+        require(msg.sender == task.assignee, "Not the assignee");
+        require(!task.completed, "Task already completed");
+        task.completed = true;
+        emit TaskCompleted(taskId);
+
+        // Using assert to ensure task is marked as completed
+        assert(task.completed == true);
+    }
+
+    function revokeTask(uint256 taskId) public {
+        Task storage task = tasks[taskId];
+        require(msg.sender == task.assignee, "Not the assignee");
+        if (!task.completed) {
+            revert("Task not completed");
         }
+        task.assignee = address(0);
+        task.completed = false;
+        emit TaskAssigned(taskId, address(0));
+
+        // Using assert to ensure task is marked as not completed
+        assert(task.completed == false);
     }
 }
